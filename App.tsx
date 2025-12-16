@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { MOCK_PROPERTIES, MOCK_REQUESTS } from './constants';
-import { Property, RequestStatus, TenantProfile, BookingRequest, UserRole } from './types';
+import { Property, RequestStatus, TenantProfile, BookingRequest, UserRole, PropertyType, Furnishing } from './types';
 import PropertyCard from './components/PropertyCard';
 import TenantProfileForm from './components/TenantProfileForm';
 import OwnerDashboard from './components/OwnerDashboard';
 import ChatInterface from './components/ChatInterface';
 import { calculateTenantScore } from './services/geminiService';
-import { Search, Map, User, Home, Menu, X, Building, CheckCircle } from 'lucide-react';
+import { Search, Map, User, Home, Menu, X, Building, CheckCircle, Filter } from 'lucide-react';
 
 type ViewState = 'HOME' | 'SEARCH' | 'PROPERTY_DETAIL' | 'PROFILE_FORM' | 'OWNER_DASHBOARD' | 'CHAT';
 
@@ -21,6 +21,27 @@ const App: React.FC = () => {
   
   // State for Owner Dashboard
   const [ownerRequests, setOwnerRequests] = useState<BookingRequest[]>(MOCK_REQUESTS);
+
+  // Search Filters
+  const [filterTypes, setFilterTypes] = useState<PropertyType[]>([]);
+  const [filterFurnishing, setFilterFurnishing] = useState<Furnishing[]>([]);
+  const [maxPrice, setMaxPrice] = useState<number>(15000);
+
+  // Derived Filtered Properties
+  const filteredProperties = MOCK_PROPERTIES.filter(p => {
+    if (filterTypes.length > 0 && !filterTypes.includes(p.type)) return false;
+    if (filterFurnishing.length > 0 && !filterFurnishing.includes(p.furnishing)) return false;
+    if (p.price > maxPrice) return false;
+    return true;
+  });
+
+  const toggleFilterType = (type: PropertyType) => {
+    setFilterTypes(prev => prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type]);
+  };
+
+  const toggleFurnishing = (item: Furnishing) => {
+    setFilterFurnishing(prev => prev.includes(item) ? prev.filter(f => f !== item) : [...prev, item]);
+  };
 
   const handlePropertySelect = (p: Property) => {
     setSelectedProperty(p);
@@ -78,7 +99,7 @@ const App: React.FC = () => {
           </div>
 
           <div className="hidden md:flex items-center gap-6 text-sm font-medium text-slate-600">
-            <button onClick={() => setView('SEARCH')} className="hover:text-teal-600 transition">Find a Home</button>
+            <button onClick={() => setView('SEARCH')} className={`hover:text-teal-600 transition ${view === 'SEARCH' ? 'text-teal-600 font-bold' : ''}`}>Find a Home</button>
             <button className="hover:text-teal-600 transition">List Property</button>
             <div className="h-4 w-px bg-slate-300"></div>
             <button 
@@ -133,20 +154,81 @@ const App: React.FC = () => {
         {view === 'SEARCH' && (
           <div className="flex h-[calc(100vh-64px)]">
             {/* Sidebar Filters */}
-            <div className="w-80 bg-white border-r p-6 hidden md:block overflow-y-auto">
-                <h2 className="font-bold text-lg mb-4">Filters</h2>
-                <div className="space-y-6">
+            <div className="w-80 bg-white border-r p-6 hidden md:block overflow-y-auto shrink-0">
+                <div className="flex items-center gap-2 mb-6 text-slate-800">
+                    <Filter size={20} />
+                    <h2 className="font-bold text-lg">Filters</h2>
+                </div>
+                
+                <div className="space-y-8">
+                    
+                    {/* Price Range */}
                     <div>
-                        <label className="text-sm font-semibold text-slate-700 block mb-2">Location Type</label>
-                        <div className="space-y-2">
-                            <label className="flex items-center gap-2 text-sm text-slate-600"><input type="checkbox" className="rounded text-teal-600" /> Near LRT/MRT</label>
-                            <label className="flex items-center gap-2 text-sm text-slate-600"><input type="checkbox" className="rounded text-teal-600" /> Near University</label>
+                        <label className="text-sm font-bold text-slate-700 block mb-3">Max Price</label>
+                        <input 
+                            type="range" 
+                            min="500" 
+                            max="15000" 
+                            step="500"
+                            value={maxPrice}
+                            onChange={(e) => setMaxPrice(Number(e.target.value))}
+                            className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-teal-600" 
+                        />
+                        <div className="flex justify-between text-sm font-medium text-slate-600 mt-2">
+                            <span>RM 500</span>
+                            <span className="text-teal-700">RM {maxPrice.toLocaleString()}</span>
                         </div>
                     </div>
+
+                    {/* Property Type */}
                     <div>
-                        <label className="text-sm font-semibold text-slate-700 block mb-2">Price Range (RM)</label>
-                        <input type="range" min="500" max="5000" className="w-full accent-teal-600" />
-                        <div className="flex justify-between text-xs text-slate-500 mt-1"><span>500</span><span>5000+</span></div>
+                        <label className="text-sm font-bold text-slate-700 block mb-3">Property Type</label>
+                        <div className="space-y-2">
+                            {Object.values(PropertyType).map(type => (
+                                <label key={type} className="flex items-center gap-3 text-sm text-slate-600 cursor-pointer hover:text-slate-900">
+                                    <input 
+                                        type="checkbox" 
+                                        checked={filterTypes.includes(type)}
+                                        onChange={() => toggleFilterType(type)}
+                                        className="w-4 h-4 rounded text-teal-600 focus:ring-teal-500 border-slate-300" 
+                                    /> 
+                                    {type}
+                                </label>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Furnishing */}
+                    <div>
+                        <label className="text-sm font-bold text-slate-700 block mb-3">Furnishing</label>
+                        <div className="space-y-2">
+                             {Object.values(Furnishing).map(item => (
+                                <label key={item} className="flex items-center gap-3 text-sm text-slate-600 cursor-pointer hover:text-slate-900">
+                                    <input 
+                                        type="checkbox" 
+                                        checked={filterFurnishing.includes(item)}
+                                        onChange={() => toggleFurnishing(item)}
+                                        className="w-4 h-4 rounded text-teal-600 focus:ring-teal-500 border-slate-300" 
+                                    /> 
+                                    {item}
+                                </label>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Location (Static for now as per previous code, but good to keep) */}
+                    <div>
+                        <label className="text-sm font-bold text-slate-700 block mb-3">Highlights</label>
+                        <div className="space-y-2">
+                            <label className="flex items-center gap-3 text-sm text-slate-600 cursor-pointer">
+                                <input type="checkbox" className="w-4 h-4 rounded text-teal-600 border-slate-300" /> 
+                                Near LRT/MRT
+                            </label>
+                            <label className="flex items-center gap-3 text-sm text-slate-600 cursor-pointer">
+                                <input type="checkbox" className="w-4 h-4 rounded text-teal-600 border-slate-300" /> 
+                                Near University
+                            </label>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -154,21 +236,47 @@ const App: React.FC = () => {
             {/* Results */}
             <div className="flex-grow bg-slate-50 p-6 overflow-y-auto">
                 <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-xl font-bold">Klang Valley Properties</h2>
+                    <div>
+                        <h2 className="text-xl font-bold text-slate-900">Available Properties</h2>
+                        <p className="text-sm text-slate-500">{filteredProperties.length} results found</p>
+                    </div>
                     <div className="flex gap-2">
-                        <button className="bg-white border px-3 py-1 rounded-lg text-sm flex items-center gap-1"><Map size={14}/> Map View</button>
+                        <button className="bg-white border hover:bg-slate-50 px-3 py-2 rounded-lg text-sm flex items-center gap-2 font-medium text-slate-700 transition">
+                            <Map size={16}/> Map View
+                        </button>
                     </div>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {MOCK_PROPERTIES.map(p => (
-                        <PropertyCard key={p.id} property={p} onViewDetails={handlePropertySelect} />
-                    ))}
-                </div>
+                
+                {filteredProperties.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {filteredProperties.map(p => (
+                            <PropertyCard key={p.id} property={p} onViewDetails={handlePropertySelect} />
+                        ))}
+                    </div>
+                ) : (
+                    <div className="text-center py-20">
+                        <div className="inline-flex bg-slate-200 p-4 rounded-full mb-4">
+                            <Search className="text-slate-400" size={32} />
+                        </div>
+                        <h3 className="text-lg font-bold text-slate-700">No properties found</h3>
+                        <p className="text-slate-500">Try adjusting your filters to see more results.</p>
+                        <button 
+                            onClick={() => {
+                                setFilterTypes([]);
+                                setFilterFurnishing([]);
+                                setMaxPrice(15000);
+                            }}
+                            className="mt-4 text-teal-600 font-medium hover:underline"
+                        >
+                            Clear all filters
+                        </button>
+                    </div>
+                )}
             </div>
           </div>
         )}
 
-        {/* Property Detail / Booking Flow */}
+        {/* ... Other Views ... */}
         {view === 'PROPERTY_DETAIL' && selectedProperty && (
           <div className="container mx-auto p-4 md:p-8 max-w-5xl">
             <button onClick={() => setView('SEARCH')} className="mb-4 text-slate-500 hover:text-slate-800 text-sm flex items-center gap-1">← Back to Search</button>
@@ -281,7 +389,6 @@ const App: React.FC = () => {
   );
 };
 
-// Simple Icon component wrapper for lucide-react just in case, but direct usage is better.
 const MapPin = ({size, className}: {size?:number, className?: string}) => (
     <svg xmlns="http://www.w3.org/2000/svg" width={size || 24} height={size || 24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
 );
